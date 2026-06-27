@@ -83,7 +83,7 @@ let
       # the canonical name, so defaultApplet=lua makes a bare `lua script.lua`
       # run the interpreter; an argv[0] of `luac` runs the compiler.
       printf '%s\n' lua luac > multicall/apps.list
-${lib.multicallDispatcherC { name = "lua"; defaultApplet = "lua"; }}
+${lib.multicallTableDispatcherC { name = "lua"; defaultApplet = "lua"; }}
       $CC -O2 -c -o multicall/dispatcher.o multicall/dispatcher.c
 
       # Final link: cc-wrapper adds -static (pkgsStatic/mingw). Library objects
