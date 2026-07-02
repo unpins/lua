@@ -86,3 +86,6 @@ The [Releases](https://github.com/unpins/lua/releases) page has standalone binar
   DLL and its macOS path links a dylib; both are replaced with a static link of
   `liblua.a` so every target is a single self-contained binary
   (`otool -L`/imports show only system libraries).
+- **Tests.** Lua's official tarball ships no `make check`; the conformance suite
+  is a separate download (`lua-5.4.x-tests.tar.gz`), so there is nothing to run
+  at build time. `lua -v` is the smoke floor.
