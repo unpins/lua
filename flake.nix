@@ -40,12 +40,13 @@
       smoke = [ "-v" "-e" "os.exit(0)" ];
       smokePattern = "Lua 5\\.4";
 
-      # Build via the unpin-llvm engine + emit a bitcode multicall module. On
-      # Linux the engine compiles lua5_4 (lua + luac) to bitcode and the
-      # standalone self-folds them into one `lua` binary; darwin (no engine)
-      # keeps the objcopy fold in ./multicall.nix; windows via windowsBuild.
-      # Pure C — no requires.cxx. The bare smoke (`lua -v …`) runs the
-      # interpreter, so defaultProgram pins it (pkgsAttr=lua5_4, name ≠ attr).
+      # Build via the unpin-llvm engine + emit a bitcode multicall module. The
+      # engine compiles lua5_4 (lua + luac) to bitcode and the standalone
+      # self-folds them into one `lua` binary on BOTH Linux and darwin
+      # (mac-on-mac); ./multicall.nix's objcopy fold is windows-only now (see
+      # the build fn). windows via windowsBuild. Pure C — no requires.cxx. The
+      # bare smoke (`lua -v …`) runs the interpreter, so defaultProgram pins it
+      # (pkgsAttr=lua5_4, name ≠ attr).
       pkgsAttr = "lua5_4";
       engine = "unpin-llvm";
       multicall = {
@@ -64,16 +65,39 @@
           readlineFB = p.readline.override { ncurses = p.ncurses; };
           base = neutralizeLuaRoot (p.lua5_4.override { readline = readlineFB; });
         in
-        if pkgs.stdenv.hostPlatform.isLinux
-        # engine path: apps → bitcode → selfFold. lua5_4 sets postBuild/
-        # postInstall to literal `null` (not absent), which the bitcode hook's
-        # `(old.postBuild or "")` can't coerce — neutralize to "" so the hook
-        # can append its module-emit step.
-        then base.overrideAttrs (old: {
+        # Engine path for Linux AND darwin (mac-on-mac): apps → bitcode →
+        # selfFold. multicall.nix's objcopy fold can't run here anymore — nix-lib's
+        # universal bitcode libc makes the compiled objects LLVM bitcode, and
+        # `llvm-objcopy --redefine-syms` rejects them ("not a valid object file").
+        # lua5_4 sets postBuild/postInstall to literal `null` (not absent), which
+        # the bitcode hook's `(old.postBuild or "")` can't coerce — neutralize to
+        # "" so the hook can append its module-emit step.
+        base.overrideAttrs (old: {
           postBuild = if old.postBuild == null then "" else old.postBuild;
           postInstall = if old.postInstall == null then "" else old.postInstall;
-        })
-        else import ./multicall.nix { lib = pkgs.lib // ulib; } { inherit pkgs; lua = base; };
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+          # darwin liblua-as-static (self-fold needs a captured `.a`):
+          # nixpkgs' 5.4.darwin.patch rebuilds liblua as a `.dylib` and links the
+          # interpreter against it (`-L. -llua.<ver>`), so no `liblua.a` is ever
+          # produced. The engine self-fold only captures static `.a` archives to
+          # fold into the bitcode module, so a dylib liblua leaves every `lua_*`
+          # symbol undefined at the mega link. Drop that darwin patch so lua builds
+          # the stock static `liblua.a` (exactly as on Linux) and the interpreter
+          # links it positionally — the capture shim then folds it in.
+          patches = builtins.filter
+            (p: !(pkgs.lib.hasInfix "darwin.patch" (toString p)))
+            (old.patches or [ ]);
+          # configurePhase still hard-codes installFlagsArray TO_LIB to the dylib
+          # name on darwin; rewrite it to the static archive we now build so
+          # `make install` copies liblua.a rather than a nonexistent dylib.
+          postConfigure = (if old.postConfigure == null then "" else old.postConfigure) + ''
+            for i in "''${!installFlagsArray[@]}"; do
+              case "''${installFlagsArray[$i]}" in
+                TO_LIB=*) installFlagsArray[$i]="TO_LIB=liblua.a" ;;
+              esac
+            done
+          '';
+        });
       windowsBuild = pkgs:
         let base = neutralizeLuaRoot (ulib.mingwStaticCross pkgs).lua5_4; in
         import ./multicall.nix { lib = pkgs.lib // ulib; } { inherit pkgs; lua = base; };
