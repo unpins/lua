@@ -35,8 +35,7 @@
       inherit self;
       name = "lua";
       # `lua --version` isn't a flag; `lua -v` prints the banner then drops into
-      # the REPL — a trailing `-e` makes it print and exit 0. defaultProgram=lua
-      # routes the bare/renamed binary here.
+      # the REPL — a trailing `-e` makes it print and exit 0.
       smoke = [ "-v" "-e" "os.exit(0)" ];
       smokePattern = "Lua 5\\.4";
 
@@ -44,13 +43,12 @@
       # engine compiles lua5_4 (lua + luac) to bitcode and the standalone
       # self-folds them into one `lua` binary on BOTH Linux and darwin
       # (mac-on-mac); ./multicall.nix's objcopy fold is windows-only now (see
-      # the build fn). windows via windowsBuild. Pure C — no requires.cxx. The
-      # bare smoke (`lua -v …`) runs the interpreter, so defaultProgram pins it
+      # the build fn). windows via windowsBuild. Pure C — no requires.cxx. `lua` is
+      # itself a program, so a bare invocation runs the interpreter
       # (pkgsAttr=lua5_4, name ≠ attr).
       pkgsAttr = "lua5_4";
       engine = "unpin-llvm";
       multicall = {
-        defaultProgram = "lua";
         programs = [ { name = "lua"; } { name = "luac"; } ];
       };
       build = pkgs:
