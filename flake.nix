@@ -9,13 +9,13 @@
   inputs.unpins-lib.url = "github:unpins/nix-lib";
 
   # lua + luac folded into one multicall binary at $out/bin/lua, with `luac`
-  # as an argv[0]-dispatch UNPIN_META alias. See ./multicall.nix.
+  # as an argv[0]-dispatch UNPIN_META alias.
   #
   # Lua's stdlib is entirely C — there is no tree of `.lua` files to embed — so
   # this needs none of the VFS machinery perl (@INC) and python (stdlib zip)
   # require; pkgsStatic already yields a self-contained interpreter. Two
   # store-path leaks are fixed below (LUA_ROOT module-search defaults, and the
-  # readline→terminfo path); see ./multicall.nix for the static-link details.
+  # readline→terminfo path).
   outputs = { self, unpins-lib }:
     let
       ulib = unpins-lib.lib;
@@ -41,14 +41,14 @@
 
       # Build via the unpin-llvm engine + emit a bitcode multicall module. The
       # engine compiles lua5_4 (lua + luac) to bitcode and the standalone
-      # self-folds them into one `lua` binary on BOTH Linux and darwin
-      # (mac-on-mac); ./multicall.nix's objcopy fold is windows-only now (see
-      # the build fn). windows via windowsBuild. Pure C — no requires.cxx. `lua` is
+      # self-folds them into one `lua` binary on every target — Linux, darwin
+      # (mac-on-mac) and windows alike. Pure C — no requires.cxx. `lua` is
       # itself a program, so a bare invocation runs the interpreter
       # (pkgsAttr=lua5_4, name ≠ attr).
       pkgsAttr = "lua5_4";
       engine = "unpin-llvm";
       multicall = {
+        windows = true;
         programs = [ { name = "lua"; } { name = "luac"; } ];
       };
       build = pkgs:
@@ -97,7 +97,27 @@
           '';
         });
       windowsBuild = pkgs:
-        let base = neutralizeLuaRoot (ulib.mingwStaticCross pkgs).lua5_4; in
-        import ./multicall.nix { lib = pkgs.lib // ulib; } { inherit pkgs; lua = base; };
+        neutralizeLuaRoot ((ulib.mingwStaticCross pkgs).lua5_4.overrideAttrs (old: {
+          # No readline on Windows (luaconf skips the REPL line editing there),
+          # and nothing provides the `-lncurses` nixpkgs pins in MYLIBS.
+          buildInputs = [ ];
+          # PLAT=mingw is Lua's DLL recipe: it relinks liblua as lua54.dll
+          # (`AR=$(CC) -shared -o`, `RANLIB=strip --strip-unneeded`) and links
+          # lua.exe/luac.exe AGAINST that DLL. The link capture only records
+          # objects and archives, so a DLL-linked program would yield a module
+          # with every lua_* undefined. `generic` (empty SYSCFLAGS/SYSLIBS)
+          # builds the same static liblua.a every other target folds — luaconf.h
+          # auto-detects _WIN32 for LoadLibrary, so no Windows define is needed.
+          makeFlags = (builtins.filter
+            (f: !(pkgs.lib.hasPrefix "PLAT=" f) && !(pkgs.lib.hasPrefix "MYLIBS=" f))
+            (old.makeFlags or [ ])) ++ [ "PLAT=generic" "MYLIBS=" ];
+          # A mingw driver writes `lua.exe` for `-o lua`; nixpkgs' TO_BIN lists
+          # the bare names, so give `make install` something to find either way.
+          postBuild = ''
+            for p in lua luac; do
+              [ -e "src/$p" ] || cp "src/$p.exe" "src/$p"
+            done
+          '';
+        }));
     };
 }
