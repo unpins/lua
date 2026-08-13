@@ -63,10 +63,9 @@ The [Releases](https://github.com/unpins/lua/releases) page has standalone binar
   `argv[0]`-dispatch alias. The bare/canonical `lua` runs the interpreter
   (`defaultApplet`); `lua --unpin-program=luac …` reaches the compiler from the
   bare binary. Both share the whole Lua library, so — unlike the Info-ZIP/bzip2
-  recipe — we don't prefix-rename every global; `nm` confirms `lua.c`/`luac.c`
-  each define only `main`, so we compile the library objects once, rename just
-  `main` → `lua_main`/`luac_main`, and link with the shared dispatcher. See
-  `multicall.nix`.
+  recipe — every global stays as it is: the library objects are compiled once
+  and the unpin-llvm engine folds the two entry points into a single binary, on
+  every platform including Windows.
 - **No VFS / embedded data needed.** Lua's standard library is entirely C —
   there is no tree of `.lua` files to ship — so the interpreter is naturally
   self-contained (contrast `unpins/perl` `@INC` and `unpins/python` stdlib).
