@@ -71,6 +71,11 @@
         # the bitcode hook's `(old.postBuild or "")` can't coerce — neutralize to
         # "" so the hook can append its module-emit step.
         base.overrideAttrs (old: {
+          # Off, and measured: lua's `make test` is one line — `./lua -v` —
+          # and the real suite (lua-tests) is a separate tarball upstream does
+          # not ship with the source. Our smoke already runs `lua -v`, so
+          # turning this on would duplicate the floor and read as a suite.
+          doCheck = false;
           postBuild = if old.postBuild == null then "" else old.postBuild;
           postInstall = if old.postInstall == null then "" else old.postInstall;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
