@@ -62,10 +62,7 @@ The [Releases](https://github.com/unpins/lua/releases) page has standalone binar
   compiler) are folded into one binary at `$out/bin/lua`, with `luac` an
   `argv[0]`-dispatch alias. A bare `lua` runs the interpreter, because the
   package's own name is one of its programs; `lua --unpin-program=luac …`
-  reaches the compiler from the same file. Both share the whole Lua library, so — unlike the Info-ZIP/bzip2
-  recipe — every global stays as it is: the library objects are compiled once
-  and the unpin-llvm engine folds the two entry points into a single binary, on
-  every platform including Windows.
+  reaches the compiler from the same file.
 - **No VFS / embedded data needed.** Lua's standard library is entirely C —
   there is no tree of `.lua` files to ship — so the interpreter is naturally
   self-contained (contrast `unpins/perl` `@INC` and `unpins/python` stdlib).
