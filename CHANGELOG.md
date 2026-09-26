@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [5.4.7-1] - 2026-09-26
+
 ### Added
 
 - First release of Lua 5.4.7 as a single self-contained binary for Linux,
