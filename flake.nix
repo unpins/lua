@@ -13,9 +13,8 @@
   #
   # Lua's stdlib is entirely C — there is no tree of `.lua` files to embed — so
   # this needs none of the VFS machinery perl (@INC) and python (stdlib zip)
-  # require; pkgsStatic already yields a self-contained interpreter. Two
-  # store-path leaks are fixed below (LUA_ROOT module-search defaults, and the
-  # readline→terminfo path).
+  # require; pkgsStatic already yields a self-contained interpreter. The
+  # LUA_ROOT store-path leak is fixed below; terminfo comes from nix-lib.
   outputs = { self, unpins-lib }:
     let
       ulib = unpins-lib.lib;
@@ -28,12 +27,9 @@
       smoke = [ "-v" "-e" "os.exit(0)" ];
       smokePattern = "Lua 5\\.5";
 
-      # Build via the unpin-llvm engine + emit a bitcode multicall module. The
-      # engine compiles lua5_4 (lua + luac) to bitcode and the standalone
-      # self-folds them into one `lua` binary on every target — Linux, darwin
-      # (mac-on-mac) and windows alike. Pure C — no requires.cxx. `lua` is
-      # itself a program, so a bare invocation runs the interpreter
-      # (pkgsAttr=lua5_4, name ≠ attr).
+      # The engine compiles lua + luac to bitcode and folds them into one `lua`
+      # binary on every target. `lua` is itself a program, so a bare invocation
+      # runs the interpreter (pkgsAttr=lua5_5, name ≠ attr).
       pkgsAttr = "lua5_5";
       engine = "unpin-llvm";
       multicall = {
@@ -51,13 +47,7 @@
           # carries it.
           base = p.lua5_5;
         in
-        # Engine path for Linux AND darwin (mac-on-mac): apps → bitcode →
-        # selfFold. multicall.nix's objcopy fold can't run here anymore — nix-lib's
-        # universal bitcode libc makes the compiled objects LLVM bitcode, and
-        # `llvm-objcopy --redefine-syms` rejects them ("not a valid object file").
-        # lua5_4 sets postBuild/postInstall to literal `null` (not absent), which
-        # the bitcode hook's `(old.postBuild or "")` can't coerce — neutralize to
-        # "" so the hook can append its module-emit step.
+        # Linux and darwin.
         base.overrideAttrs (old: {
           # Keep luaconf.h's LUA_ROOT "/usr/local/". In a static build nixpkgs'
           # postPatch is only the sed that points it at $out, a /nix/store path
@@ -78,7 +68,7 @@
           '';
         } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
           # darwin liblua-as-static (self-fold needs a captured `.a`):
-          # nixpkgs' 5.4.darwin.patch rebuilds liblua as a `.dylib` and links the
+          # nixpkgs' 5.5.darwin.patch rebuilds liblua as a `.dylib` and links the
           # interpreter against it (`-L. -llua.<ver>`), so no `liblua.a` is ever
           # produced. The engine self-fold only captures static `.a` archives to
           # fold into the bitcode module, so a dylib liblua leaves every `lua_*`
@@ -104,7 +94,7 @@
           # No readline on Windows (luaconf skips the REPL line editing there),
           # and nothing provides the `-lncurses` nixpkgs pins in MYLIBS.
           buildInputs = [ ];
-          # PLAT=mingw is Lua's DLL recipe: it relinks liblua as lua54.dll
+          # PLAT=mingw is Lua's DLL recipe: it relinks liblua as lua55.dll
           # (`AR=$(CC) -shared -o`, `RANLIB=strip --strip-unneeded`) and links
           # lua.exe/luac.exe AGAINST that DLL. The link capture only records
           # objects and archives, so a DLL-linked program would yield a module
