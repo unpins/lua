@@ -1,5 +1,5 @@
 {
-  description = "Lua 5.4 (lua + luac) as a single self-contained binary";
+  description = "Lua 5.5 (lua + luac) as a single self-contained binary";
 
   nixConfig = {
     extra-substituters = [ "https://unpins.cachix.org" ];
@@ -26,7 +26,7 @@
       # `lua --version` isn't a flag; `lua -v` prints the banner then drops into
       # the REPL — a trailing `-e` makes it print and exit 0.
       smoke = [ "-v" "-e" "os.exit(0)" ];
-      smokePattern = "Lua 5\\.4";
+      smokePattern = "Lua 5\\.5";
 
       # Build via the unpin-llvm engine + emit a bitcode multicall module. The
       # engine compiles lua5_4 (lua + luac) to bitcode and the standalone
@@ -34,7 +34,7 @@
       # (mac-on-mac) and windows alike. Pure C — no requires.cxx. `lua` is
       # itself a program, so a bare invocation runs the interpreter
       # (pkgsAttr=lua5_4, name ≠ attr).
-      pkgsAttr = "lua5_4";
+      pkgsAttr = "lua5_5";
       engine = "unpin-llvm";
       multicall = {
         windows = true;
@@ -49,7 +49,7 @@
           # → one shared ncurses .a in the mega) is baked centrally into every
           # engine ncurses by native-overlay/ncurses.nix, so p.ncurses already
           # carries it.
-          base = p.lua5_4;
+          base = p.lua5_5;
         in
         # Engine path for Linux AND darwin (mac-on-mac): apps → bitcode →
         # selfFold. multicall.nix's objcopy fold can't run here anymore — nix-lib's
@@ -68,6 +68,14 @@
           # not ship with the source. Our smoke already runs `lua -v`, so
           # turning this on would duplicate the floor and read as a suite.
           doCheck = false;
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          # Lua 5.5's linux recipe dlopen()s libreadline.so at run time, which a
+          # static binary cannot do. LUA_USE_READLINE links it in instead (what
+          # 5.4's linux-readline did); CFLAGS from nixpkgs drops MYCFLAGS.
+          env = (old.env or { }) // { NIX_CFLAGS_COMPILE = "-DLUA_USE_READLINE"; };
+          postConfigure = (if old.postConfigure == null then "" else old.postConfigure) + ''
+            makeFlagsArray+=("MYLIBS=-lreadline -lncurses")
+          '';
         } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
           # darwin liblua-as-static (self-fold needs a captured `.a`):
           # nixpkgs' 5.4.darwin.patch rebuilds liblua as a `.dylib` and links the
@@ -92,7 +100,7 @@
           '';
         });
       windowsBuild = pkgs:
-        (ulib.mingwStaticCross pkgs).lua5_4.overrideAttrs (old: {
+        (ulib.mingwStaticCross pkgs).lua5_5.overrideAttrs (old: {
           # No readline on Windows (luaconf skips the REPL line editing there),
           # and nothing provides the `-lncurses` nixpkgs pins in MYLIBS.
           buildInputs = [ ];
