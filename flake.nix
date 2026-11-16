@@ -19,17 +19,6 @@
   outputs = { self, unpins-lib }:
     let
       ulib = unpins-lib.lib;
-      # Put LUA_ROOT back to the neutral upstream default: nixpkgs' postPatch
-      # rewrites luaconf.h's `#define LUA_ROOT "/usr/local/"` to `"$out/"`, which
-      # bakes a /nix/store path into the compiled-in module search paths — a
-      # portability-gate ref and meaningless in a relocatable single binary.
-      # (Windows is immune: luaconf uses `!`-relative defaults there.) lua5_4
-      # sets postConfigure=null explicitly, so `or ""` won't catch it.
-      neutralizeLuaRoot = drv: drv.overrideAttrs (old: {
-        postConfigure = (if old.postConfigure == null then "" else old.postConfigure) + ''
-          sed -i "s@$out/@/usr/local/@g" src/luaconf.h
-        '';
-      });
     in
     ulib.mkStandaloneFlake {
       inherit self;
@@ -60,7 +49,7 @@
           # → one shared ncurses .a in the mega) is baked centrally into every
           # engine ncurses by native-overlay/ncurses.nix, so p.ncurses already
           # carries it.
-          base = neutralizeLuaRoot p.lua5_4;
+          base = p.lua5_4;
         in
         # Engine path for Linux AND darwin (mac-on-mac): apps → bitcode →
         # selfFold. multicall.nix's objcopy fold can't run here anymore — nix-lib's
@@ -70,6 +59,10 @@
         # the bitcode hook's `(old.postBuild or "")` can't coerce — neutralize to
         # "" so the hook can append its module-emit step.
         base.overrideAttrs (old: {
+          # Keep luaconf.h's LUA_ROOT "/usr/local/". In a static build nixpkgs'
+          # postPatch is only the sed that points it at $out, a /nix/store path
+          # baked into the module search defaults.
+          postPatch = "";
           # Off, and measured: lua's `make test` is one line — `./lua -v` —
           # and the real suite (lua-tests) is a separate tarball upstream does
           # not ship with the source. Our smoke already runs `lua -v`, so
