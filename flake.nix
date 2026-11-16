@@ -60,8 +60,7 @@
           # → one shared ncurses .a in the mega) is baked centrally into every
           # engine ncurses by native-overlay/ncurses.nix, so p.ncurses already
           # carries it.
-          readlineFB = p.readline.override { ncurses = p.ncurses; };
-          base = neutralizeLuaRoot (p.lua5_4.override { readline = readlineFB; });
+          base = neutralizeLuaRoot p.lua5_4;
         in
         # Engine path for Linux AND darwin (mac-on-mac): apps → bitcode →
         # selfFold. multicall.nix's objcopy fold can't run here anymore — nix-lib's
@@ -76,8 +75,6 @@
           # not ship with the source. Our smoke already runs `lua -v`, so
           # turning this on would duplicate the floor and read as a suite.
           doCheck = false;
-          postBuild = if old.postBuild == null then "" else old.postBuild;
-          postInstall = if old.postInstall == null then "" else old.postInstall;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
           # darwin liblua-as-static (self-fold needs a captured `.a`):
           # nixpkgs' 5.4.darwin.patch rebuilds liblua as a `.dylib` and links the
