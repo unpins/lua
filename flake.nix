@@ -99,7 +99,7 @@
           '';
         });
       windowsBuild = pkgs:
-        neutralizeLuaRoot ((ulib.mingwStaticCross pkgs).lua5_4.overrideAttrs (old: {
+        (ulib.mingwStaticCross pkgs).lua5_4.overrideAttrs (old: {
           # No readline on Windows (luaconf skips the REPL line editing there),
           # and nothing provides the `-lncurses` nixpkgs pins in MYLIBS.
           buildInputs = [ ];
@@ -120,6 +120,6 @@
               [ -e "src/$p" ] || cp "src/$p.exe" "src/$p"
             done
           '';
-        }));
+        });
     };
 }
