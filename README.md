@@ -58,30 +58,21 @@ The [Releases](https://github.com/unpins/lua/releases) page has standalone binar
 
 ## Build notes
 
-- **Single multicall binary.** `lua` (interpreter) and `luac` (bytecode
-  compiler) are folded into one binary at `$out/bin/lua`, with `luac` an
-  `argv[0]`-dispatch alias. A bare `lua` runs the interpreter, because the
-  package's own name is one of its programs; `lua --unpin-program=luac …`
-  reaches the compiler from the same file.
-- **No VFS / embedded data needed.** Lua's standard library is entirely C —
-  there is no tree of `.lua` files to ship — so the interpreter is naturally
-  self-contained (contrast `unpins/perl` `@INC` and `unpins/python` stdlib).
-  `require` of external *Lua* modules still works; `require` of external *C*
-  modules (`package.loadlib`/`dlopen`) does not, as expected for one static
-  binary.
-- **REPL line editing.** Linux/macOS link readline; a curated terminfo set is
-  compiled into the binary (ncurses `--disable-database` + fallback), so the
-  REPL edits correctly even on a host with no `/usr/share/terminfo` and the
-  binary keeps no `/nix/store` reference. Windows has no readline (upstream
-  doesn't support it there).
-- **Module search paths neutralized.** nixpkgs bakes the build's store prefix
-  into `package.path`/`package.cpath`; we reset `LUA_ROOT` to the upstream
-  `/usr/local/` default so the binary carries no store path (the paths are
-  inert in a single binary anyway). Windows uses Lua's `!`-relative defaults.
-- **Static linking, per target.** Upstream's `mingw` Makefile target builds a
-  DLL and its macOS path links a dylib; both are replaced with a static link of
-  `liblua.a` so every target is a single self-contained binary
-  (`otool -L`/imports show only system libraries).
-- **Tests.** Lua's official tarball ships no `make check`; the conformance suite
-  is a separate download (`lua-5.4.x-tests.tar.gz`), so there is nothing to run
-  at build time. `lua -v` is the smoke floor.
+- **`luac` in the same file.** A bare `lua` runs the interpreter;
+  `lua --unpin-program=luac …` runs the bytecode compiler, and installing
+  creates a `luac` command.
+- **REPL line editing.** Linux and macOS link readline into the binary
+  (upstream's Linux build loads `libreadline.so` at run time instead). A set of
+  common terminals is built in as a fallback; the system's terminfo, when
+  present, takes precedence. Windows has no line editing (upstream doesn't
+  support it there).
+- **Module search paths.** Lua modules are looked up under `/usr/local`
+  (`share/lua/5.5`, `lib/lua/5.5`) and in the current directory; on Windows,
+  in the executable's folder (and its `lua` subfolder) and the current
+  directory.
+- **Static liblua.** Upstream builds liblua as a DLL on Windows (mingw) and a
+  dylib on macOS; here `liblua.a` is linked in on every target.
+- **Not included:** loading compiled C modules (`require` of a `.so` or
+  `.dll`; they link against a shared liblua this binary doesn't have).
+- **Tests:** the Lua test suite is not run: it is a separate download, not
+  part of the source release, and `make test` only runs `lua -v`.

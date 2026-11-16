@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Lua 5.5.0, up from 5.4.7. Scripts written for 5.4 may need changes; the
+  [Lua 5.5 manual](https://www.lua.org/manual/5.5/manual.html#8) lists the
+  incompatibilities. The REPL keeps line editing and history.
+
 ## [5.4.7-1] - 2026-09-26
 
 ### Added
